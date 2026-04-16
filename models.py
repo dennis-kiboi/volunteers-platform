@@ -1,5 +1,6 @@
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import MetaData
+from sqlalchemy_serializer import SerializerMixin
 
 metadata = MetaData(naming_convention={
     "ix": 'ix_%(column_0_label)s',
@@ -11,7 +12,7 @@ metadata = MetaData(naming_convention={
 
 db = SQLAlchemy(metadata=metadata)
 
-class Volunteer(db.Model):
+class Volunteer(db.Model, SerializerMixin):
     __tablename__ = "volunteers"
 
     id = db.Column(db.Integer, primary_key=True)
@@ -22,37 +23,26 @@ class Volunteer(db.Model):
 
     task_assignments = db.relationship("TaskAssignment",back_populates="volunteer", cascade="all, delete-orphan")
 
-    def to_dict(self):
-        return {
-            "id": self.id,
-            "name": self.name,
-            "email": self.email,
-            "profile": self.profile.to_dict() if self.profile else None
-        }
+    serialize_rules = ('-profile.volunteer', '-task_assignments.volunteer', '-task_assignments.task.task_assignments')
 
     def __repr__(self):
         return f"Volunteer(name='{self.name}', email='{self.email}')"
     
-class Profile(db.Model):
+class Profile(db.Model, SerializerMixin):
     __tablename__ = "profiles"
     id = db.Column(db.Integer, primary_key=True)
     bio = db.Column(db.Text)
     phone = db.Column(db.String(20))
-
     volunteer_id = db.Column(db.Integer, db.ForeignKey("volunteers.id"))
+
     volunteer = db.relationship("Volunteer", back_populates="profile")
 
-    def to_dict(self):
-        return {
-            "id": self.id,
-            "bio": self.bio,
-            "phone": self.phone
-        }
+    serialize_rules =('-volunteer.profile',)
     
     def __repr__(self):
         return f"Profile(bio='{self.bio}', phone='{self.phone}')"
     
-class Project(db.Model):
+class Project(db.Model, SerializerMixin):
     __tablename__ = "projects"
 
     id = db.Column(db.Integer, primary_key=True)
@@ -61,18 +51,12 @@ class Project(db.Model):
 
     tasks = db.relationship("Task", back_populates="project", cascade="all, delete-orphan")
 
-    def to_dict(self):
-        return {
-            "id": self.id,
-            "name": self.name,
-            "description": self.description,
-            "tasks": [task.to_dict() for task in self.tasks]
-        }
+    serialize_rules = ('-tasks.project',)
 
     def __repr__(self):
         return f"Project(name='{self.name}', description='{self.description}')"
 
-class Task(db.Model):
+class Task(db.Model, SerializerMixin):
     __tablename__ = "tasks"
 
     id = db.Column(db.Integer, primary_key=True)
@@ -85,19 +69,12 @@ class Task(db.Model):
     # Many-to-many Relationship with Tasks
     task_assignments = db.relationship("TaskAssignment",back_populates="task", cascade="all, delete-orphan")
 
-    def to_dict(self):
-        return {
-            "id": self.id,
-            "title": self.title,
-            "description": self.description,
-            "project_id": self.project_id,
-            "volunteer_ids": [volunteer.id for volunteer in self.volunteers]
-        }
+    serialize_rules = ('-project.tasks', '-task_assignment.task', '-task_assignments.volunteer.task_assignments')
 
     def __repr__(self):
         return f"Task(title='{self.title}', description='{self.description}')"
 
-class TaskAssignment(db.Model):
+class TaskAssignment(db.Model, SerializerMixin):
     __tablename__ = "task_assignment"
 
     id = db.Column(db.Integer, primary_key=True)
@@ -105,4 +82,6 @@ class TaskAssignment(db.Model):
     task_id = db.Column(db.Integer, db.ForeignKey("tasks.id"))
 
     volunteer = db.relationship("Volunteer",back_populates="task_assignments")
-    tasks = db.relationship("Task",back_populates="task_assignments")
+    task = db.relationship("Task",back_populates="task_assignments")
+
+    serialize_rules = ('-volunteer.task_assignments','-task.task_assignments')

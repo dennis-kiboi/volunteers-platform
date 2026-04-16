@@ -1,5 +1,5 @@
 from flask import Flask, request, jsonify
-from models import Project, db, Volunteer, Profile, Task
+from models import Project, db, Volunteer, Profile, Task, TaskAssignment
 from flask_migrate import Migrate
 
 app = Flask(__name__)
@@ -71,7 +71,7 @@ def update_volunteer(volunteer_id):
         return jsonify(volunteer.to_dict()), 200
     except Exception:
         db.session.rollback()
-        return {"message": "An error occurred while updating the volunteer"}, 500
+        return jsonify({"message": "An error occurred while updating the volunteer"}), 500
 
 # Delete a volunteer
 
@@ -238,17 +238,19 @@ def delete_project(project_id):
         db.session.rollback()
         return {"message": "An error occurred while deleting the project"}, 500
 
+# Assign task to vulunteer
 @app.route("/volunteers/<int:volunteer_id>/tasks/<int:task_id>", methods=["PUT"])
 def assign_task(volunteer_id, task_id):
     volunteer = Volunteer.query.get(volunteer_id)
     task = Task.query.get(task_id)
 
     if not volunteer or not task:
-        return jsonify({"message": "Task or Volunteer was not found!"})
+        return jsonify({"message": "Task or Volunteer was not found!"}), 404
     
     try:
-        volunteer.tasks.append(task)
-        db.session.add(volunteer)
+        # volunteer.tasks.append(task)
+        new_task_assignment = TaskAssignment(volunteer_id=volunteer_id, task_id=task_id)
+        db.session.add(new_task_assignment)
         db.session.commit()
         return jsonify({"message": "Task assigned Successfully!"}), 201
 
