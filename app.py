@@ -1,5 +1,5 @@
 from flask import Flask, request, jsonify
-from models import db, Volunteer, Profile
+from models import Project, db, Volunteer, Profile, Task
 from flask_migrate import Migrate
 
 app = Flask(__name__)
@@ -174,6 +174,86 @@ def delete_profile(profile_id):
     except Exception:
         db.session.rollback()
         return {"message": "An error occurred while deleting the profile"}, 500
+
+# CRUD routes for projects and tasks would follow a similar pattern to the above routes for volunteers and profiles, including error handling and appropriate HTTP status codes.
+@app.route("/projects", methods=["POST"])
+def create_project():
+    data = request.get_json()
+    new_project = Project(name=data["name"], description=data["description"])
+
+    try:
+        db.session.add(new_project)
+        db.session.commit()
+        return new_project.to_dict(), 201
+    except Exception:
+        db.session.rollback()
+        return {"message": "An error occurred while creating the project"}, 500
+
+# GET all projects
+@app.route("/projects", methods=["GET"])
+def get_projects():
+    projects = Project.query.all()
+    return jsonify(projects=[project.to_dict() for project in projects])
+
+# GET a specific project by ID
+@app.route("/projects/<int:project_id>", methods=["GET"])
+def get_project(project_id):
+    project = Project.query.get_or_404(project_id)
+    return jsonify(project.to_dict())
+
+# Update a project
+@app.route("/projects/<int:project_id>", methods=["PATCH"])
+def update_project(project_id): 
+    project = Project.query.get_or_404(project_id)
+    data = request.get_json()
+
+    if not data:
+        return {"message": "No data provided"}, 400
+
+    try:
+        if "name" in data:
+            project.name = data["name"]
+        if "description" in data:
+            project.description = data["description"]
+
+        db.session.commit()
+        return jsonify(project.to_dict()), 200
+    except Exception:
+        db.session.rollback()
+        return {"message": "An error occurred while updating the project"}, 500
+    
+# Delete a project
+@app.route("/projects/<int:project_id>", methods=["DELETE"])
+def delete_project(project_id):
+    project = Project.query.get_or_404(project_id)
+
+    if not project:
+        return {"message": "Project not found"}, 404
+
+    try:
+        db.session.delete(project)
+        db.session.commit()
+        return jsonify({}), 204
+    except Exception:
+        db.session.rollback()
+        return {"message": "An error occurred while deleting the project"}, 500
+
+@app.route("/volunteers/<int:volunteer_id>/tasks/<int:task_id>", methods=["PUT"])
+def assign_task(volunteer_id, task_id):
+    volunteer = Volunteer.query.get(volunteer_id)
+    task = Task.query.get(task_id)
+
+    if not volunteer or not task:
+        return jsonify({"message": "Task or Volunteer was not found!"})
+    
+    try:
+        volunteer.tasks.append(task)
+        db.session.add(volunteer)
+        db.session.commit()
+        return jsonify({"message": "Task assigned Successfully!"}), 201
+
+    except Exception:
+        return {"message": "An error occurred while assigning a task to the volunteer."}, 500
 
 
 if __name__ == "__main__":
